@@ -21,13 +21,7 @@ import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Map;
 
-import javax.jms.Connection;
-import javax.jms.Destination;
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.MessageConsumer;
-import javax.jms.MessageProducer;
-import javax.jms.Session;
+import javax.jms.*;
 import javax.naming.Context;
 import javax.naming.NamingException;
 
@@ -241,6 +235,15 @@ public final class Utils {
                 msg.setObjectProperty(name, value);
             }
         }
+    }
+
+    public static void addJMSProperties(Message msg, Map<String, Object> map, Context ctx) throws JMSException, NamingException {
+        Object value = map.remove("JMSReplyTo");
+        if(value != null) {
+            Destination replyQueue = lookupDestination(ctx, (String) value);
+            msg.setJMSReplyTo(replyQueue);
+        }
+        addJMSProperties(msg, map);
     }
 
 
