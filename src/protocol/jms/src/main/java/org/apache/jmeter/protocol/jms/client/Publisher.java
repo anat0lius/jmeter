@@ -21,16 +21,7 @@ import java.io.Closeable;
 import java.io.Serializable;
 import java.util.Map;
 
-import javax.jms.BytesMessage;
-import javax.jms.Connection;
-import javax.jms.Destination;
-import javax.jms.JMSException;
-import javax.jms.MapMessage;
-import javax.jms.Message;
-import javax.jms.MessageProducer;
-import javax.jms.ObjectMessage;
-import javax.jms.Session;
-import javax.jms.TextMessage;
+import javax.jms.*;
 import javax.naming.Context;
 import javax.naming.NamingException;
 
@@ -186,7 +177,7 @@ public class Publisher implements Closeable {
             Map<String, Object> properties, Message msg,
             int deliveryMode, int priority, long expiration)
             throws JMSException, NamingException {
-        Utils.addJMSProperties(msg, properties);
+        Utils.addJMSProperties(msg, properties, ctx);
         if (staticDest || destinationName == null) {
             producer.send(msg, deliveryMode, priority, expiration);
         } else {
