@@ -23,21 +23,7 @@ import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Map;
 
-import javax.jms.BytesMessage;
-import javax.jms.DeliveryMode;
-import javax.jms.JMSException;
-import javax.jms.MapMessage;
-import javax.jms.Message;
-import javax.jms.ObjectMessage;
-import javax.jms.Queue;
-import javax.jms.QueueBrowser;
-import javax.jms.QueueConnection;
-import javax.jms.QueueConnectionFactory;
-import javax.jms.QueueReceiver;
-import javax.jms.QueueSender;
-import javax.jms.QueueSession;
-import javax.jms.Session;
-import javax.jms.TextMessage;
+import javax.jms.*;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
@@ -59,6 +45,8 @@ import org.apache.jmeter.threads.JMeterContextService;
 import org.apache.jmeter.util.JMeterUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.lang.IllegalStateException;
 
 /**
  * This class implements the JMS Point-to-Point sampler
@@ -293,7 +281,7 @@ public class JMSSampler extends AbstractSampler implements ThreadListener {
     }
 
     private void handleRequestResponse(SampleResult res) throws JMSException {
-        TextMessage msg = createMessage();
+        BytesMessage msg = createBytesMessage();
         if (!useTemporyQueue()) {
             LOGGER.debug("NO TEMP QUEUE");
             msg.setJMSReplyTo(receiveQueue);
@@ -308,6 +296,10 @@ public class JMSSampler extends AbstractSampler implements ThreadListener {
         } else {
             if (replyMsg instanceof TextMessage) {
                 res.setResponseData(((TextMessage) replyMsg).getText(), null);
+            } else if(replyMsg instanceof BytesMessage) {
+                byte[] body = new byte[(int) msg.getBodyLength()];
+                msg.readBytes(body, (int) msg.getBodyLength());
+                res.setResponseData(body);
             } else {
                 res.setResponseData(replyMsg.toString(), null);
             }
@@ -333,8 +325,8 @@ public class JMSSampler extends AbstractSampler implements ThreadListener {
             if (reply != null) {
                 res.setResponseMessage("1 message received successfully");
                 res.setResponseHeaders(reply.toString());
-                TextMessage msg = (TextMessage) reply;
-                retVal = msg.getText();
+                BytesMessage msg = (BytesMessage) reply;
+                retVal = msg.getJMSCorrelationID();
                 extractContent(buffer, propBuffer, msg);
             } else {
                 res.setResponseMessage("No message received");
@@ -365,7 +357,7 @@ public class JMSSampler extends AbstractSampler implements ThreadListener {
                     }
                 } else if (msg instanceof BytesMessage) {
                     BytesMessage bytesMessage = (BytesMessage) msg;
-                    buffer.append(bytesMessage.getBodyLength() + " bytes received in BytesMessage");
+                    buffer.append(bytesMessage.getBodyLength()).append(" bytes received in BytesMessage");
                 } else if (msg instanceof MapMessage) {
                     MapMessage mapm = (MapMessage) msg;
                     @SuppressWarnings("unchecked") // MapNames are Strings
@@ -383,7 +375,7 @@ public class JMSSampler extends AbstractSampler implements ThreadListener {
                 }
                 Utils.messageProperties(propBuffer, msg);
             } catch (JMSException e) {
-                buffer.append("Error extracting content from message:"+e.getMessage());
+                buffer.append("Error extracting content from message:").append(e.getMessage());
                 LOGGER.error("Error extracting content from message", e);
             }
         }
@@ -404,21 +396,18 @@ public class JMSSampler extends AbstractSampler implements ThreadListener {
             // count number of messages
             String corrID;
             while (e.hasMoreElements()) {
-                TextMessage message = (TextMessage) e.nextElement();
+                BytesMessage message = (BytesMessage) e.nextElement();
                 corrID = message.getJMSCorrelationID();
                 if (corrID == null) {
                     corrID = message.getJMSMessageID();
                     messageBodies.append(numMsgs)
                         .append(" - MessageID: ")
                         .append(corrID)
-                        .append(": ").append(message.getText())
                         .append("\n");
                 } else {
                     messageBodies.append(numMsgs)
                     .append(" - CorrelationID: ")
                     .append(corrID)
-                    .append(": ")
-                    .append(message.getText())
                     .append("\n");
                 }
                 numMsgs++;
@@ -472,7 +461,17 @@ public class JMSSampler extends AbstractSampler implements ThreadListener {
         return msg;
     }
 
-    private void addJMSProperties(TextMessage msg) throws JMSException {
+    private BytesMessage createBytesMessage() throws JMSException {
+        if (session == null) {
+            throw new IllegalStateException("Session may not be null while creating message");
+        }
+        BytesMessage msg = session.createBytesMessage();
+        msg.writeBytes(getContent().getBytes(StandardCharsets.UTF_8));
+        addJMSProperties(msg);
+        return msg;
+    }
+
+    private void addJMSProperties(Message msg) throws JMSException {
         Utils.addJMSProperties(msg, getJMSProperties().getJmsPropertysAsMap());
     }
 
