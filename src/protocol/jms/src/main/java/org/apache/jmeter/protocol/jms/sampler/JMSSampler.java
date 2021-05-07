@@ -17,6 +17,7 @@
 
 package org.apache.jmeter.protocol.jms.sampler;
 
+import java.lang.IllegalStateException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -49,8 +50,6 @@ import org.apache.jmeter.threads.JMeterContextService;
 import org.apache.jmeter.util.JMeterUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.lang.IllegalStateException;
 
 /**
  * This class implements the JMS Point-to-Point sampler
@@ -301,8 +300,9 @@ public class JMSSampler extends AbstractSampler implements ThreadListener {
             if (replyMsg instanceof TextMessage) {
                 res.setResponseData(((TextMessage) replyMsg).getText(), null);
             } else if(replyMsg instanceof BytesMessage) {
-                byte[] body = new byte[(int) msg.getBodyLength()];
-                msg.readBytes(body, (int) msg.getBodyLength());
+                BytesMessage byteMsg = (BytesMessage) replyMsg;
+                byte[] body = new byte[(int) byteMsg.getBodyLength()];
+                byteMsg.readBytes(body, (int) byteMsg.getBodyLength());
                 res.setResponseData(body);
             } else {
                 res.setResponseData(replyMsg.toString(), null);
